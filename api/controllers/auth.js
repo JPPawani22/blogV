@@ -1,7 +1,6 @@
 import { db } from "../db.js"
 import bcrypt from "bcryptjs"
 import jwt from "jsonwebtoken"
-import cookieParser from "cookie-parser"
 
 export const register = (req, res)=>{
 
@@ -44,6 +43,7 @@ export const login = (req, res)=>{
         if(!isPasswordCorrect) return res.status(400).json("Wrong username or password!")
         
         const token = jwt.sign({id:data[0].id}, "jwtkey");
+        console.log("Login - User ID in token:", data[0].id); // DEBUG
         const {password, ...other} = data[0]
 
         res.cookie("access_token", token, {httpOnly:true}).status(200).json(other) 
