@@ -1,93 +1,208 @@
-import React from 'react'
-import Menu from '../components/Menu'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { useState, useEffect, useContext} from 'react'
-import { AuthContext } from '../context/authContext.jsx'
-import axios from "axios"
-import moment from "moment"
-import Edit from "../img/edit.png"
-import Delete from "../img/delete.png"
+import React from 'react';
+import Menu from '../components/Menu';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useContext } from 'react';
+import { AuthContext } from '../context/authContext.jsx';
+import axios from 'axios';
+import moment from 'moment';
+import Edit from '../img/edit.png';
+import Delete from '../img/delete.png';
 
 const Single = () => {
+  const [post, setPost] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [notification, setNotification] = useState({ show: false, message: '', type: '' });
 
-  const [post, setPost] = useState({})
-
-  const location = useLocation()
-  const postId = location.pathname.split("/")[2]
-
+  const location = useLocation();
+  const postId = location.pathname.split('/')[2];
   const navigate = useNavigate();
+  const { currentUser, logout } = useContext(AuthContext);
 
+  const showNotification = (message, type = 'info') => {
+    setNotification({ show: true, message, type });
+    setTimeout(() => setNotification({ show: false, message: '', type: '' }), 5000);
+  };
 
-  const {currentUser} = useContext(AuthContext);
+  // Enhanced error handler for authentication issues
+  const handleAuthError = (error) => {
+    if (error.response?.status === 401) {
+      showNotification('Your session has expired. Please log in again.', 'error');
+      logout();
+      setTimeout(() => navigate('/login'), 2000);
+    } else {
+      showNotification(error.response?.data?.message || 'An error occurred', 'error');
+    }
+  };
 
   const handleDelete = async () => {
-    try {
-      await axios.delete(`/api/posts/${postId}`,{
-        withCredentials: true
-      });
-      navigate("/")
-    } catch (err) {
-      console.log(err)
+    if (!currentUser) {
+      showNotification('Please log in to delete posts', 'error');
+      return;
     }
-  }
 
-  const handleUpdate = async () => {
+    if (!window.confirm('Are you sure you want to delete this post? This action cannot be undone.')) {
+      return;
+    }
+
     try {
-      await axios.put(`/api/posts/${postId}`,{
+      const response = await axios.delete(`/api/posts/${postId}`, {
+        withCredentials: true,
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.status === 200) {
+        showNotification('Post deleted successfully', 'success');
+        setTimeout(() => navigate('/'), 1500);
+      }
+    } catch (err) {
+      console.error('Error deleting post:', err);
+      handleAuthError(err);
+    }
+  };
+
+  const fetchPost = async () => {
+    setLoading(true);
+    try {
+      const res = await axios.get(`/api/posts/${postId}`, {
         withCredentials: true
       });
-      navigate("/")
+      setPost(res.data);
     } catch (err) {
-      console.log(err)
+      console.error('Error fetching post:', err);
+      if (err.response?.status === 404) {
+        showNotification('Post not found', 'error');
+        setTimeout(() => navigate('/'), 2000);
+      } else {
+        handleAuthError(err);
+      }
+    } finally {
+      setLoading(false);
     }
-  }
+  };
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const res = await axios.get(`/api/posts/${postId}`);
-        setPost(res.data)
-      } catch (err) {
-        console.log(err)
-      }
-    }
-    fetchData()
+    fetchPost();
   }, [postId]);
 
-    // Fix: Compare user ID instead of username
+  // Check if current user can edit/delete this post
   const canEditDelete = currentUser && post.uid === currentUser.id;
+
+  const getText = (html) => {
+    if (!html) return '';
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    return doc.body.textContent || '';
+  };
+
+  if (loading) {
+    return (
+      <div className="single">
+        <div className="loading">Loading post...</div>
+      </div>
+    );
+  }
+
+  if (!post.id) {
+    return (
+      <div className="single">
+        <div className="no-posts">Post not found or you don't have permission to view it.</div>
+      </div>
+    );
+  }
 
   return (
     <div className='single'>
+      {notification.show && (
+        <div className={`notification ${notification.type}`}>
+          {notification.message}
+          <button 
+            className="notification-close"
+            onClick={() => setNotification({ show: false, message: '', type: '' })}
+          >
+            ×
+          </button>
+        </div>
+      )}
+      
       <div className="content">
-           <img src={post?.img} alt="" />
-        <div className="user">
-           {post.userImg && <img src={post.userImg} alt="" />}
-        <div className="info">
-        <span>{post.username}</span>
-        <p>Posted {moment(post.date).fromNow()}</p>
-      </div>
-      {canEditDelete && (<div className="edit">
-        <Link to ={`/write?edit=${postId}`}>
-          <img onClick={handleUpdate} src={Edit} alt="" />
-        </Link>
+        {post.img && (
+          <img 
+            src={`/upload/${post.img}`} 
+            alt={post.title} 
+            onError={(e) => {
+              e.target.style.display = 'none';
+            }}
+          />
+        )}
         
-        <img onClick={handleDelete} src={Delete} alt="" />
+        <div className="user">
+          {post.userImg && (
+            <img 
+              src={post.userImg} 
+              alt={post.username} 
+              onError={(e) => {
+                e.target.src = '/default-avatar.png';
+              }}
+            />
+          )}
+          <div className="info">
+            <span>{post.username || 'Unknown Author'}</span>
+            <p>Posted {post.date ? moment(post.date).fromNow() : 'recently'}</p>
+            {post.cat && (
+              <span className="category-tag">#{post.cat}</span>
+            )}
+          </div>
+          
+          {canEditDelete && (
+            <div className="edit">
+              <Link to={`/write?edit=${postId}`} state={post}>
+                <img 
+                  src={Edit} 
+                  alt="Edit post" 
+                  title="Edit post"
+                />
+              </Link>
+              <img 
+                onClick={handleDelete} 
+                src={Delete} 
+                alt="Delete post" 
+                title="Delete post"
+                className="delete-btn"
+              />
+            </div>
+          )}
+        </div>
+
+        <h1>{post.title || 'Untitled Post'}</h1>
+        
+        <div className="post-content">
+          {post.desc ? (
+            <div dangerouslySetInnerHTML={{ __html: post.desc }} />
+          ) : (
+            <p>No content available for this post.</p>
+          )}
+        </div>
+
+        {/* Post metadata */}
+        <div className="post-meta">
+          {post.date && (
+            <span className="post-date">
+              Published on {moment(post.date).format('MMMM D, YYYY')}
+            </span>
+          )}
+          {post.cat && (
+            <span className="post-category">
+              Category: {post.cat.charAt(0).toUpperCase() + post.cat.slice(1)}
+            </span>
+          )}
+        </div>
       </div>
-    )}
-      </div>
 
-      <h1>{post.title}</h1>
-      {post.desc}
+      <Menu cat={post.cat} />
+    </div>
+  );
+};
 
-   </div>
-
-      {/* menu */}
-      <Menu cat={post.cat}/>
-
-  </div>
-  )
-  }
-
-
-export default Single
+export default Single;

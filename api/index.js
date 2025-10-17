@@ -4,7 +4,6 @@ import userRoutes from "./routes/users.js"
 import authRoutes from "./routes/auth.js"
 import cookieParser from "cookie-parser";
 import multer from "multer";
-import fs from "fs";
 import path from "path";
 import { fileURLToPath } from 'url';
 
@@ -17,18 +16,20 @@ const __dirname = path.dirname(__filename);
 app.use(express.json())
 app.use(cookieParser())
 
-// Ensure upload directory exists
-const uploadDir = path.join(__dirname, '..', 'client', 'public', 'upload');
+// Serve static files from backend upload directory
+app.use('/upload', express.static(path.join(__dirname, 'upload')));
 
-// Multer configuration
+// Create upload directory in backend
+const uploadDir = path.join(__dirname, 'upload');
+
+// Multer configuration - save to backend upload directory
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, uploadDir);
   },
   filename: function (req, file, cb) {
-    // Create unique filename with timestamp and original name
     const uniqueSuffix = Date.now() + '-';
-    cb(null, uniqueSuffix + '-' + file.originalname);
+    cb(null, uniqueSuffix + file.originalname);
   }
 });
 
@@ -38,7 +39,6 @@ const upload = multer({
     fileSize: 5 * 1024 * 1024, // 5MB limit
   },
   fileFilter: (req, file, cb) => {
-    // Validate file types
     if (file.mimetype.startsWith('image/')) {
       cb(null, true);
     } else {
@@ -64,21 +64,11 @@ app.post("/api/upload", upload.single("file"), function (req, res) {
   }
 });
 
-// Error handling middleware for multer
-app.use((error, req, res, next) => {
-  if (error instanceof multer.MulterError) {
-    if (error.code === 'LIMIT_FILE_SIZE') {
-      return res.status(400).json({ error: 'File too large' });
-    }
-  }
-  res.status(400).json({ error: error.message });
-});
-
 app.use("/api/auth", authRoutes)
 app.use("/api/users", userRoutes)
 app.use("/api/posts", postRoutes)
 
 app.listen(8800, () => {
-  console.log("Connected! Server running on port 8800");
+  console.log("Connected!");
   console.log(`Upload directory: ${uploadDir}`);
 });
