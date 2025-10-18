@@ -1,4 +1,5 @@
 import React from 'react';
+import { FaSignOutAlt, FaUser, FaEdit, FaHome, FaInfoCircle, FaSignInAlt } from 'react-icons/fa';
 import { Link } from 'react-router-dom';
 import Logo from '../img/logo.png';
 import { useContext } from 'react';
@@ -35,12 +36,14 @@ const Navbar = () => {
             <h6>FOOD</h6>
           </Link>
 
-          <span className="username">Welcome, {currentUser?.username}!</span>
+          <span className="username">  <FaUser /> Welcome, {currentUser?.username}!</span>
           {currentUser ? (
-            <span className="logout" onClick={logout}>Logout</span>
+            <span className="logout" onClick={logout}>
+              <FaSignOutAlt/> Logout
+            </span>
           ) : (
             <Link className="link" to="/login">
-              <h6>Login</h6>
+              <h6><i className="fa fa-sign-in"></i> <FaSignInAlt/> Login</h6>
             </Link>
           )}
           <span className="write"> 

@@ -6,6 +6,7 @@ import cookieParser from "cookie-parser";
 import multer from "multer";
 import path from "path";
 import { fileURLToPath } from 'url';
+import cors from 'cors'; // Add CORS
 
 const app = express();
 
@@ -13,11 +14,17 @@ const app = express();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Add CORS middleware
+app.use(cors({
+  origin: 'http://localhost:5173', // Your Vite frontend
+  credentials: true
+}));
+
 app.use(express.json())
 app.use(cookieParser())
 
-// Serve static files from backend upload directory
-app.use('/upload', express.static(path.join(__dirname, 'upload')));
+// Serve static files from backend upload directory - FIXED PATH
+app.use('/api/upload', express.static(path.join(__dirname, 'upload')));
 
 // Create upload directory in backend
 const uploadDir = path.join(__dirname, 'upload');
@@ -64,11 +71,14 @@ app.post("/api/upload", upload.single("file"), function (req, res) {
   }
 });
 
+
 app.use("/api/auth", authRoutes)
 app.use("/api/users", userRoutes)
 app.use("/api/posts", postRoutes)
 
 app.listen(8800, () => {
   console.log("Connected!");
+  console.log(`Backend running on: http://localhost:8800`);
   console.log(`Upload directory: ${uploadDir}`);
+  console.log(`Images served at: http://localhost:8800/api/upload/`);
 });

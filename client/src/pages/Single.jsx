@@ -7,11 +7,15 @@ import axios from 'axios';
 import moment from 'moment';
 import Edit from '../img/edit.png';
 import Delete from '../img/delete.png';
+import { FaUserCircle } from 'react-icons/fa'; // Import user icon
 
 const Single = () => {
-  const [post, setPost] = useState({});
+  const [post, setPost] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [notification, setNotification] = useState({ show: false, message: '', type: '' });
+  const [imageError, setImageError] = useState(false);
+  const [userImageError, setUserImageError] = useState(false);
 
   const location = useLocation();
   const postId = location.pathname.split('/')[2];
@@ -34,6 +38,7 @@ const Single = () => {
     }
   };
 
+  
   const handleDelete = async () => {
     if (!currentUser) {
       showNotification('Please log in to delete posts', 'error');
@@ -65,35 +70,62 @@ const Single = () => {
 
   const fetchPost = async () => {
     setLoading(true);
+    setError(null);
+    setImageError(false);
+    setUserImageError(false);
     try {
       const res = await axios.get(`/api/posts/${postId}`, {
         withCredentials: true
       });
-      setPost(res.data);
+      
+      // Check if post data is valid and has required fields
+      if (res.data && res.data.title) {
+        setPost(res.data);
+      } else {
+        setError('Post not found');
+        setPost(null);
+      }
     } catch (err) {
       console.error('Error fetching post:', err);
       if (err.response?.status === 404) {
+        setError('Post not found');
         showNotification('Post not found', 'error');
-        setTimeout(() => navigate('/'), 2000);
+      } else if (err.response?.status === 403) {
+        setError('You do not have permission to view this post');
+        showNotification('You do not have permission to view this post', 'error');
       } else {
+        setError('Failed to load post');
         handleAuthError(err);
       }
+      setPost(null);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchPost();
+    if (postId) {
+      fetchPost();
+    }
   }, [postId]);
 
   // Check if current user can edit/delete this post
-  const canEditDelete = currentUser && post.uid === currentUser.id;
+  const canEditDelete = currentUser && post && post.uid === currentUser.id;
 
   const getText = (html) => {
     if (!html) return '';
     const doc = new DOMParser().parseFromString(html, 'text/html');
     return doc.body.textContent || '';
+  };
+
+  // Handle post image error
+  const handlePostImageError = () => {
+    setImageError(true);
+  };
+
+  // Handle user image error
+  const handleUserImageError = () => {
+    setUserImageError(true);
   };
 
   if (loading) {
@@ -104,10 +136,20 @@ const Single = () => {
     );
   }
 
-  if (!post.id) {
+  if (error || !post) {
     return (
       <div className="single">
-        <div className="no-posts">Post not found or you don't have permission to view it.</div>
+        <div className="error-container">
+          <div className="error-message">
+            {error || 'Post not found or you don\'t have permission to view it.'}
+          </div>
+          <button 
+            onClick={() => navigate('/')}
+            className="back-home-btn"
+          >
+            Back to Home
+          </button>
+        </div>
       </div>
     );
   }
@@ -127,26 +169,28 @@ const Single = () => {
       )}
       
       <div className="content">
-        {post.img && (
+        {post.img && !imageError && (
           <img 
             src={`/upload/${post.img}`} 
             alt={post.title} 
-            onError={(e) => {
-              e.target.style.display = 'none';
-            }}
+            onError={handlePostImageError}
           />
         )}
         
         <div className="user">
-          {post.userImg && (
-            <img 
-              src={post.userImg} 
-              alt={post.username} 
-              onError={(e) => {
-                e.target.src = '/default-avatar.png';
-              }}
-            />
-          )}
+          <div className="user-avatar">
+            {post.userImg && !userImageError ? (
+              <img 
+                src={post.userImg} 
+                alt={post.username} 
+                onError={handleUserImageError}
+              />
+            ) : (
+              <div className="user-avatar-fallback">
+                <FaUserCircle className="user-icon" />
+              </div>
+            )}
+          </div>
           <div className="info">
             <span>{post.username || 'Unknown Author'}</span>
             <p>Posted {post.date ? moment(post.date).fromNow() : 'recently'}</p>

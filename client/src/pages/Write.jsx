@@ -22,7 +22,7 @@ const Write = () => {
   // Gemini API configuration
   const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
-  console.log('Gemini API Key:', GEMINI_API_KEY ? 'Loaded' : 'Not found');
+  // console.log('Gemini API Key:', GEMINI_API_KEY ? 'Loaded' : 'Not found');
 
   const showNotification = (message, type = 'info') => {
     setNotification({ show: true, message, type });
